@@ -6,8 +6,10 @@ from tkinter import ttk
 from PIL import ImageTk, Image
 import os
 import shutil
-
+import getpass
+import platform
 import json
+import datetime
 
 class Application(tk.Frame):
     def __init__(self, master=None):
@@ -85,7 +87,7 @@ class Application(tk.Frame):
         package_dspace_dip.insert(0, '09c098c1-99b1-4130-8337-7733409d39b8')
         tk.Label(text='?', width=22, font=('Arial', 12)).grid(row=row_count, column=2, padx=(0, 10), pady=y_pad,
                                                                          sticky=tk.W)
-        self.metadata.append(('dspace_dip_collection', package_dspace_aip))
+        self.metadata.append(('dspace_dip_collection', package_dspace_dip))
 
         row_count += 1
 
@@ -156,7 +158,9 @@ class Application(tk.Frame):
 
 
     def _generate_json(self):
-        test = { 'parts': 'objects/'}
+        test = { 'parts': 'objects/',
+                 'dc.description.provenance': 'Submitted to Archivematica by ' + getpass.getuser() + " on computer "
+                 + platform.node() + ' at ' + str(datetime.datetime.now())}
 
         for p in self.metadata:
             print(p, p[0], p[1])
