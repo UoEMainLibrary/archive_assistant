@@ -15,6 +15,8 @@ import json
 import datetime
 import requests
 
+from urllib.parse import urlparse
+
 # TODO
 # Fix hidden values in treeview
 
@@ -33,75 +35,132 @@ import requests
 
 
 class MetadataWindow(tk.Toplevel):
-    def __init__(self, master=None):
-        super().__init__(master)
+    def __init__(self, root=None, item='objects/'):
+        super().__init__()
+        #self.protocol("WM_DELETE_WINDOW", lambda: self)
+        self.json_object = root._generate_json()
 
-    '''def create_contents_frame(self, contents_frame):
-           self.contents_tree = ttk.Treeview(contents_frame,
-                                             selectmode='browse',
-                                             columns=('#1'),
-                                             displaycolumns=('#1'),
-                                             show=["headings"])
-           # tree.bind("<<TreeviewSelect>>", self.treeview)
-           self.contents_tree.grid(row=0, column=0, pady=self.y_pad)
-           # tree.heading("#0", text="dcterm")
-           # tree.column("#0", minwidth=0, width=100)
-           self.contents_tree.heading("#1", text="name")
-           self.contents_tree.column("#1", minwidth=0,
-                                     width=400)
-           # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
-           # self.contents_tree.heading("#2", text="value")
-           # self.contents_tree.column("#2", minwidth=0, width=200)
-           # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
-           # self.metadata_tree.bind("<Button-1>", (lambda x: self.on_click2(x, dcterms_combo, dcterms_value)))
+        self.dcterms = ['dc.contributor.advisor', 'dc.contributor.author', 'dc.contributor.editor',
+                        'dc.contributor.illustrator', 'dc.contributor.other', 'dc.contributor', 'dc.coverage.spatial',
+                        'dc.coverage.temporal', 'dc.creator', 'dc.date.accessioned', 'dc.date.available',
+                        'dc.date.copyright', 'dc.date.created', 'dc.date.issued', 'dc.date.submitted',
+                        'dc.date.updated', 'dc.date', 'dc.description.abstract', 'dc.description.provenance',
+                        'dc.description.sponsorship', 'dc.description.statementofresponsibility',
+                        'dc.description.tableofcontents', 'dc.description.uri', 'dc.description.version',
+                        'dc.description', 'dc.format.extent', 'dc.format.medium', 'dc.format.mimetype', 'dc.format',
+                        'dc.identifier.citation', 'dc.identifier.govdoc', 'dc.identifier.isbn', 'dc.identifier.ismn',
+                        'dc.identifier.issn', 'dc.identifier.other', 'dc.identifier.sici', 'dc.identifier.slug',
+                        'dc.identifier.uri', 'dc.identifier', 'dc.language.iso', 'dc.language.rfc3066', 'dc.language',
+                        'dc.provenance', 'dc.publisher', 'dc.relation.haspart', 'dc.relation.hasversion',
+                        'dc.relation.isbasedon', 'dc.relation.isformatof', 'dc.relation.ispartof',
+                        'dc.relation.ispartofseries', 'dc.relation.isreferencedby', 'dc.relation.isreplacedby',
+                        'dc.relation.isversionof', 'dc.relation.replaces', 'dc.relation.requires', 'dc.relation.uri',
+                        'dc.relation', 'dc.rights.holder', 'dc.rights.license', 'dc.rights.uri', 'dc.rights',
+                        'dc.source.uri', 'dc.source', 'dc.subject.classification', 'dc.subject.ddc', 'dc.subject.lcc',
+                        'dc.subject.lcsh', 'dc.subject.mesh', 'dc.subject.other', 'dc.subject', 'dc.title.alternative',
+                        'dc.title', 'dc.type']
 
-           # self.add_metadata(tree, 'dc.title', 'A transfer title')
+        self.controls_frame = self.dcterm = self.dcterm_value = None
 
-           ttk.Button(contents_frame,
-                      text='Edit item metadata',
-                      command=lambda: self.edit_metadata(self.contents_tree)) \
-               .grid(row=0,
-                     column=2,
-                     padx=(5, 10),
-                     pady=self.y_pad,
-                     sticky=tk.W)
+        self.metadata_entries = 0
 
-           ttk.Button(contents_frame,
-                      text='Delete item',
-                      command=lambda: self.delete_metadata(self.contents_tree)) \
-               .grid(row=4,
-                     column=2,
-                     padx=(5, 10),
-                     pady=self.y_pad,
-                     sticky=tk.W)
+        # Form item styling
+        self.main_label_width = 16
+        self.main_label_font = ('Helvetica', 12)
+        self.main_label_font_bold = ('Helvetica', 12, 'bold')
+        self.main_input_font = ('Helvetica', 10)
+        self.y_pad = 8
 
-           self.row_count += 1
+        # Background color manually set because themed style doesn't for some reason
+        self.configure(background='#F0F0F0')
 
-           # sep = ttk.Separator(orient=tk.HORIZONTAL)
-           # sep.grid(row=self.row_count, column=0, columnspan=3, pady=self.y_pad, sticky=tk.EW)
+        #self.json_object = json_object
 
-           ttk.Label(contents_frame, text='DC Terms:', width=10, font=self.main_label_font)\
-               .grid(row=0,
-                     column=0,
-                     padx=(10, 0),
-                     pady=self.y_pad,
-                     sticky=tk.E)
+        if self.json_object['parts'] == 'objects/':
+            self.title('Edit package metadata')
+        else:
+            self.title = self.json_object['parts']
 
-           dcterms_combo = ttk.Combobox(contents_frame, width=50, font=self.main_input_font, values=self.dcterms)
-           dcterms_combo.grid(row=0, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        print(self.json_object)
+        n_f = ttk.Frame(self)
+        self.m_f = ttk.Frame(n_f)
+        self.list_metadata(self.m_f)
+        self.m_f.pack()
+        self.position_metadata_controls(n_f)
+        n_f.pack()
 
-           self.row_count += 1
+    def add_metadata(self):
+        if self.dcterm.get() not in self.json_object:
+            tv = tk.StringVar()
+            fr = ttk.Frame(self.m_f)
+            ttk.Label(fr, text=self.dcterm.get(), width=20, font=self.main_label_font, anchor=tk.E).pack(side=tk.LEFT)
 
-           dcterms_value = ttk.Entry(contents_frame, width=40, font=self.main_input_font)
-           dcterms_value.grid(row=2, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
-           ttk.Button(contents_frame,
-                      text='Add',
-                      command=lambda : self.add_metadata(self.contents_tree, dcterms_combo, dcterms_value))\
-               .grid(row=2,
-                     column=2,
-                     padx=(5, 10),
-                     pady=self.y_pad,
-                     sticky=tk.W)'''
+            if 'description' in self.dcterm.get():
+                tk.Text(fr, width=40, height=4, font=self.main_input_font).pack()
+            else:
+                ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=tv).pack(side=tk.LEFT)
+
+            ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT)
+            tv.set(self.dcterm_value.get())
+            self.json_object[self.dcterm.get()] = tv
+            fr.pack() # grid(row=self.metadata_entries)
+        else:
+            messagebox.showerror('Error', 'Property {} already exists'.format(self.dcterm.get()))
+
+        # self.json_object[self.dcterm.get()] = self.dcterm_value.get()
+        print(self.json_object)
+
+        #self.list_metadata(None)
+        #self.position_metadata_controls(None)
+
+    def list_metadata(self, contents_frame):
+        #contents_frame = self
+        for json_property in self.json_object:
+            if not (self.json_object['parts'] == 'objects/' and (json_property == 'parts' or json_property == 'dc.description.provenance')):
+                tv = tk.StringVar()
+                fr = ttk.Frame(contents_frame)
+                ttk.Label(fr, text=json_property, width=20, font=self.main_label_font, anchor=tk.E).pack(side=tk.LEFT)
+
+                if 'description' in json_property:
+                    tk.Text(fr, width=40, height=4, font=self.main_input_font)
+                else:
+                    ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=tv).pack(side=tk.LEFT)
+
+                if json_property != 'dc.title' and json_property != 'dc.date.issued' and json_property != 'dc.creator':
+                    ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT)
+
+                tv.set(self.json_object[json_property])
+                self.json_object[json_property] = tv
+                fr.pack() # grid(row=self.metadata_entries)
+                self.metadata_entries += 1
+
+        print(self.json_object)
+        print(self.metadata_entries)
+        # sep = ttk.Separator(contents_frame, orient=tk.HORIZONTAL).pack()
+        # sep.pack() # grid(row=self.row_count, column=0, columnspan=3, pady=self.y_pad, sticky=tk.EW)
+
+    def position_metadata_controls(self, controls_frame):
+        #self.controls_frame = ttk.Frame()
+        fr = ttk.Frame(controls_frame)
+
+        ttk.Label(fr, text='DC Terms:', width=10, font=self.main_label_font).pack(side=tk.LEFT)
+        #    .grid(row=0, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
+
+        self.dcterm = tk.StringVar()
+        ttk.Combobox(fr, width=50, font=self.main_input_font, values=self.dcterms, textvariable=self.dcterm).pack(side=tk.LEFT)  # .grid(row=0, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+
+        # self.row_count += 1
+
+        self.dcterm_value = tk.StringVar()
+        ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=self.dcterm_value).pack(side=tk.LEFT)  # .grid(row=2, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        ttk.Button(fr, text='Add', command=self.add_metadata).pack(side=tk.LEFT)  # .grid(row=2, column=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        fr.pack() # grid(row=self.metadata_entries + 1)
+
+        fr = ttk.Frame(controls_frame)
+        ttk.Button(fr, text='Save').pack(side=tk.LEFT)  # .grid(row=2, column=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Button(fr, text='Cancel', command=self.destroy).pack(side=tk.LEFT)  # .grid(row=2, column=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        fr.pack() # grid(row=self.metadata_entries + 2)
+        #self.controls_frame.pack()
 
 
 class Application(tk.Frame):
@@ -110,22 +169,21 @@ class Application(tk.Frame):
         # self.grid_columnconfigure(0, weight=1)
         self.package_title = tk.StringVar()
         self.package_date = tk.StringVar()
-        self.package_date.set(datetime.datetime.today().strftime('%d/%m/%Y'))
         self.package_author = tk.StringVar()
-
         self.ds_host = tk.StringVar()
-        self.ds_host.set('http://test.digitalpreservation.is.ed.ac.uk')
-
         self.as_host = tk.StringVar()
-        self.as_host.set('http://test.archivematica.is.ed.ac.uk')
         self.as_user = tk.StringVar()
-        self.as_user.set('archivematica')
         self.as_password = tk.StringVar()
         self.as_repo = tk.StringVar()
-        self.as_repo.set('14')
 
-        self.input_dir = ''
-        self.output_dir = ''
+        self.input_dir = tk.StringVar()
+        self.output_dir = tk.StringVar()
+
+        self.inputs = [self.package_title, self.package_date, self.package_author, self.ds_host, self.as_host,
+                       self.as_user, self.as_password, self.as_repo, self.input_dir, self.output_dir]
+
+        self._reset()  # Set values to reset value
+
         # List of tuples of form items and their corresponding variables
         self.metadata = []
 
@@ -160,10 +218,11 @@ class Application(tk.Frame):
         self.main_input_font = ('Helvetica', 10)
         self.y_pad = 8
 
-        self.metadata_tree = self.contents_tree = None
+        self.metadata_tree = self.contents_tree = self.md_window = None
         
         self.create_menu(master)
         self.create_widgets(master)
+        print(self.metadata)
 
     # Helper methods
 
@@ -172,6 +231,11 @@ class Application(tk.Frame):
         f = ttk.Frame(n, relief=tk.GROOVE)
         n.add(f, text=text)
         return f
+
+    def open_metadata_window(self):
+        if self.md_window == None or self.md_window.winfo_exists() == 0:
+            self.md_window = MetadataWindow(self)
+        #print(self.md_window.json_object)
 
     def do_nothing(self):
         pass
@@ -193,6 +257,10 @@ class Application(tk.Frame):
 
         return entry_object
 
+    @staticmethod
+    def _get_base_url(parsed_url):
+        return '{url.scheme}://{url.netloc}{url.path}'.format(url=parsed_url)
+
     # Treeview manipulation
 
     @staticmethod
@@ -202,7 +270,7 @@ class Application(tk.Frame):
         item_name = tree.identify_row(event.y)
         # print(item_name)
         if item_name:
-            print(tree.item(item_name))
+            # print(tree.item(item_name))
             tags = tree.item(item_name, 'tags')
             if tags and ('collection' in tags or 'archival_object' in tags):
                 tree.selection_set(item_name)
@@ -215,14 +283,17 @@ class Application(tk.Frame):
             return tree.insert('', index='end', values=(dc_terms, dc_terms_value))
 
     @staticmethod
-    def edit_metadata(tree, dc_terms_combobox, dc_terms_value):
+    def edit_metadata(tree):
         for item_name in tree.selection():
-            tree.item(item_name, values=(dc_terms_combobox.get(), dc_terms_value.get()))
+            for v in tree.item(item_name).values():
+                print(v)
+            #tree.item(item_name, values=(dc_terms_combobox.get(), dc_terms_value.get()))
 
     @staticmethod
     def delete_metadata(tree):
         for item_name in tree.selection():
-            tree.delete(item_name)
+            pass
+            #tree.delete(item_name)
 
     # Connect to ArchivesSpace
 
@@ -232,7 +303,9 @@ class Application(tk.Frame):
             response = requests.post(host + '/users/' + user + '/login',
                                      data={'password': password, 'expiring': False})
         except requests.ConnectionError as e:
-            raise Exception("Unable to connect to ArchivesSpace server: " + str(e))
+            raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
+        except Exception as e:
+            raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
 
         try:
             output = response.json()
@@ -244,7 +317,7 @@ class Application(tk.Frame):
 
         if 'error' in output:
             raise Exception(
-                "Unable to log into ArchivesSpace installation; message from server: {}".format(output['error']))
+                "Unable to log into ArchivesSpace.\n\n{}\n\nAre the user name and password correct?".format(output['error']))
         else:
             token = output['session']
 
@@ -277,25 +350,47 @@ class Application(tk.Frame):
         return response
 
     def _populate_as_tree(self, tree):
-        session = self.login_to_as(self.as_host.get(), self.as_user.get(), self.as_password.get())
-        url = '/repositories/' + self.as_repo.get() + '/resources'
-        resources = self.request_from_as(self.as_host.get(), session.get, url, {'all_ids': True}, 200).json()
+        base_url = None
+        session = None
 
-        for r in resources:
-            as_tree = self.request_from_as(self.as_host.get(), session.get, url + '/' + str(r) + '/tree', {}, 200).json()
-            self.traverse_tree(tree, [as_tree])
+        try:
+            base_url = urlparse(self.as_host.get())
+
+            if not base_url.port:
+                base_url = base_url._replace(netloc='{}:{}'.format(base_url.netloc, 8089))
+
+        except Exception:
+            messagebox.showerror('Error', 'Could not parse URL.')
+
+        if base_url:
+            try:
+                session = self.login_to_as(self._get_base_url(base_url), self.as_user.get(), self.as_password.get())
+            except Exception as e:
+                messagebox.showerror('Error', e)
+
+        if session:
+            url = '/repositories/' + self.as_repo.get() + '/resources'
+
+            try:
+                resources = self.request_from_as(self._get_base_url(base_url), session.get, url, {'all_ids': True}, 200).json()
+
+                for r in resources:
+                    as_tree = self.request_from_as(self._get_base_url(base_url), session.get, url + '/' + str(r) + '/tree', {}, 200).json()
+                    self.traverse_tree(tree, [as_tree])
+            except Exception as e:
+                errortext = ''
+                if 'The Repository must exist' in str(e):
+                    errortext = '\n\nCould not find repository: {}'.format(self.as_repo.get())
+
+                messagebox.showerror('Error', 'Could not access ArchivesSpace.{}'.format(errortext))
 
     def traverse_tree(self, tree, as_tree, parent_obj=''):
         # print(as_tree)
         obj = None
         for node in as_tree:
-            print(node)
+            # print(node)
             if 'title' in node:
-                obj = tree.insert(parent_obj,
-                                  index='end',
-                                  text=node['title'],
-                                  tags='archival_object',
-                                  values=node['id'])
+                obj = tree.insert(parent_obj, index='end', text=node['title'], tags='archival_object', values=node['id'])
 
             if 'children' in node:
                 self.traverse_tree(tree, node['children'], obj)
@@ -304,26 +399,31 @@ class Application(tk.Frame):
 
     def _walk_community(self, communities, tree, parent_obj=''):
         for c in communities:
-            print("C: " + str(c))
+            # print("C: " + str(c))
             obj = tree.insert(parent_obj, index='end', text=c.get('name'))
 
             for co in c.get('collection'):
                 tree.insert(obj, index='end', text=co.get('name'), tags='collection', values=co['id'])
-                print("Co: " + str(co))
+                # print("Co: " + str(co))
 
             if len(c.get('community')) > 0:
-                print("Recursive")
+                # print("Recursive")
                 self._walk_community(c.get('community'), tree, obj)
 
     def _populate_dspace_tree(self, trees):
-        response = requests.get(self.ds_host.get() + '/rest/hierarchy', verify=False)
-        c = response.json().get('community')
+        response = None
 
-        # Make sure trees are empty before populating
-        for t in trees:
-            t.delete(*t.get_children())
-            self._walk_community(c, t)
-            t.tag_configure('collection', font=self.main_label_font_bold)
+        try:
+            response = requests.get(self.ds_host.get() + '/rest/hierarchy', verify=False)
+            c = response.json().get('community')
+
+            # Make sure trees are empty before populating
+            for t in trees:
+                t.delete(*t.get_children())
+                self._walk_community(c, t)
+                t.tag_configure('collection', font=self.main_label_font_bold)
+        except requests.exceptions.ConnectionError as e:
+            messagebox.showerror('Error', 'Could not access DSpace.\n\nIs the DSpace server URL correct?')
 
     # Controller methods
 
@@ -333,7 +433,8 @@ class Application(tk.Frame):
         total_files = 0
         total_size = 0
 
-        if len(os.path.normpath(directory).split(os.path.sep)) > 3: # If dir is low level don't attempt to count
+        # If dir is low level don't attempt to count
+        if len(os.path.normpath(directory).split(os.path.sep)) > 3:
             try:
                 for root, dirs, files in os.walk(directory):
                     for name in files:
@@ -362,7 +463,7 @@ class Application(tk.Frame):
                                                   + platform.node() + ' at ' + str(datetime.datetime.now())}
 
         for json_property in self.metadata:
-            if len(json_property) == 2 and isinstance(json_property[1], ttk.Entry):
+            if len(json_property) == 2 and isinstance(json_property[1], tk.StringVar):
                 # print(property, property[0], property[1])
                 json_obj[json_property[0]] = json_property[1].get()
             elif len(json_property) == 2 and isinstance(json_property[1], ttk.Treeview):
@@ -375,13 +476,13 @@ class Application(tk.Frame):
             else:
                 print(json_property)
 
-        return [json_obj]
+        return json_obj
 
     @staticmethod
     def _check_empty(tk_obj):
         if len(tk_obj.get()) == 0:
             messagebox.showerror('Error', 'Error 1')
-            tk_obj.config(background='red')
+            # tk_obj.config(background='red')
             return False
         else:
             # messagebox.showerror('Error', 'Error 2')
@@ -400,19 +501,21 @@ class Application(tk.Frame):
         return True
 
     def _reset(self):
-        for p in self.metadata:
-            p[1].delete(0, tk.END)
+        for p in self.inputs:
+            p.set('')
 
-        self.input_dir.delete(0, tk.END)
-        self.input_dir.label.config(text='')
-        self.output_dir.delete(0, tk.END)
+        self.package_date.set(datetime.datetime.today().strftime('%d/%m/%Y'))
+        self.ds_host.set('http://test.digitalpreservation.is.ed.ac.uk')
+        self.as_host.set('http://lac-archives-test.is.ed.ac.uk')
+        self.as_user.set('archivematica')
+        self.as_repo.set('14')
         # self.metadata = []
 
     def _start_transfer(self):
         if self._check_errors(self.non_empties) and \
                 messagebox.askokcancel("Confirm transfer?",
                                        "Do you want to start this transfer?\n" + self.input_dir.label.cget("text")):
-            self._generate_json()
+            # self._generate_json()
             self._copy_directory()
             # self._reset()
 
@@ -426,7 +529,7 @@ class Application(tk.Frame):
             os.mkdir(output_dir + '/metadata')
 
             with open(output_dir + '/metadata/metadata.json', 'w') as outfile:
-                json.dump(self._generate_json(), outfile)
+                json.dump([self._generate_json()], outfile)
         except FileExistsError as e:
             print('Error: ' + str(e))
         except IOError as e:
@@ -434,19 +537,21 @@ class Application(tk.Frame):
 
         messagebox.showinfo('Transfer status', "Successfully copied from:\n\n" + input_dir + "\n\nto:\n\n" + output_dir)
 
-    def _get_directory(self, text_obj, text_label=None):
+    def _get_directory(self, text_obj):
         directory = tk.filedialog.askdirectory()
-        text_obj.insert(tk.END, directory)
 
-        if text_label is not None:
+        if directory:
+            text_obj.set(directory) #insert(tk.END, directory)
+
+        if hasattr(text_obj, 'label'):
             # If tree is already populated then delete
-            for child in self.contents_tree.get_children():
-                self.contents_tree.delete(child)
+            # for child in self.contents_tree.get_children():
+            self.contents_tree.delete(*self.contents_tree.get_children())
 
-            files, size = self._get_directory_size(directory)
+            files, size = self._get_directory_size(text_obj.get())
             size = str(size/(1024*1024.0))
             size = size[:size.find('.')+2]
-            text_label.config(text="Files: " + str(files) + " Size: " + size + " mb")
+            text_obj.label.config(text="Files: " + str(files) + " Size: " + size + " mb")
 
     # Content
 
@@ -476,8 +581,8 @@ class Application(tk.Frame):
         """Create the window content"""
         # Transfer package metadata
         package_frame = ttk.Frame(master)
-        package_frame.pack()
         self.create_package_form(package_frame)
+        package_frame.pack()
 
         # Creating notebook and the three frames
         n = ttk.Notebook(padding=(10, 20))
@@ -494,7 +599,7 @@ class Application(tk.Frame):
 
         self.create_dspace_widgets(ds_aip_frame, ds_dip_frame)
         self.create_as_frame(as_dip_frame)
-        self.create_submit_frame(master, submit_frame)
+        self.create_select_frame(master, submit_frame)
 
         # Controls frame
         controls_frame = ttk.Frame(master)
@@ -534,28 +639,38 @@ class Application(tk.Frame):
         ttk.Label(package_frame, text='Author:', width=self.main_label_width, font=self.main_label_font,
                   anchor=tk.E).grid(row=2, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
 
-        ttk.Entry(package_frame, width=30, font=self.main_input_font).grid(row=2, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W, columnspan=2)
+        ttk.Entry(package_frame, width=30, textvariable=self.package_author, font=self.main_input_font).grid(row=2, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W, columnspan=2)
         self.metadata.append(('dc.creator', self.package_author))
 
         # Edit package metadata button
         ttk.Button(package_frame, text='Edit package metadata',
-                   command=self.do_nothing).grid(row=3, column=0, columnspan=3, padx=(5, 10),
+                   command=self.open_metadata_window).grid(row=3, column=0, columnspan=3, padx=(5, 10),
                                                  pady=self.y_pad, sticky=tk.E)
 
     def create_as_frame(self, as_dip_frame):
+        sbar_frame = ttk.Frame(as_dip_frame)
+
         # Content for DSpace DIP tree panel
-        as_dip_tree = ttk.Treeview(as_dip_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
+        as_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
                                    displaycolumns='Name')
         as_dip_tree.column("#0", minwidth=0, width=400)
         as_dip_tree.bind("<Button-1>", self.on_click)
-        as_dip_tree.grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        as_dip_tree.pack(side=tk.LEFT) # grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
 
         self.metadata.append(('archivesspace_dip_collection', as_dip_tree))
 
-        self.create_label_entry(as_dip_frame, 'ArchivesSpace server:', row=1, column=0, tv=self.as_host)
-        self.create_label_entry(as_dip_frame, 'ArchivesSpace repository:', row=2, column=0, tv=self.as_repo)
-        self.create_label_entry(as_dip_frame, 'ArchivesSpace username:', row=3, column=0, tv=self.as_user)
-        self.create_label_entry(as_dip_frame, 'ArchivesSpace password:', row=4, column=0, tv=self.as_password)
+        vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=as_dip_tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)  # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        sbar_frame.grid(row=0, column=0, columnspan=3)
+
+        as_dip_tree.configure(yscrollcommand=vsb.set)
+
+        # as_labelframe = ttk.Labelframe(as_dip_frame, text='ArchivesSpace config')
+
+        self.create_label_entry(as_dip_frame, 'Server URL:', row=1, column=0, tv=self.as_host)
+        self.create_label_entry(as_dip_frame, 'Repository:', row=2, column=0, tv=self.as_repo)
+        self.create_label_entry(as_dip_frame, 'Username:', row=3, column=0, tv=self.as_user)
+        self.create_label_entry(as_dip_frame, 'Password:', row=4, column=0, tv=self.as_password)
 
         ttk.Button(as_dip_frame, text="Load ArchivesSpace hierarchy",
                    command=lambda: self._populate_as_tree(as_dip_tree)).grid(row=5,
@@ -564,13 +679,14 @@ class Application(tk.Frame):
                                                                              padx=(10, 5),
                                                                              pady=self.y_pad,
                                                                              sticky=tk.E)
+        # as_labelframe.grid(row=2, column=0, pady=self.y_pad)
 
     def create_dspace_widgets(self, ds_aip_frame, ds_dip_frame):
+        # Create frame for scrollbar + treeview
+        sbar_frame = ttk.Frame(ds_aip_frame)
+
         # Content for DSpace AIP tree panel
-        ds_aip_tree = ttk.Treeview(ds_aip_frame,
-                                   selectmode='none',
-                                   show='tree',
-                                   columns=('ID #', 'Name'),
+        ds_aip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
                                    displaycolumns='Name')
         # tree.bind("<<TreeviewSelect>>", self.treeview)
         # tree.pack(expand=tk.YES, fill=tk.BOTH)
@@ -583,7 +699,13 @@ class Application(tk.Frame):
         # ds_aip_tree.column('#2', minwidth=0, width=0)
         ds_aip_tree.bind("<Button-1>", self.on_click)
         # tree.pack()
-        ds_aip_tree.grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        ds_aip_tree.pack(side=tk.LEFT) #grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+
+        vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=ds_aip_tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y) # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        sbar_frame.grid(row=0, column=0, columnspan=3)
+
+        ds_aip_tree.configure(yscrollcommand=vsb.set)
 
         self.metadata.append(('ds_aip_collection', ds_aip_tree))
 
@@ -602,6 +724,9 @@ class Application(tk.Frame):
 
         # Do DIP frame
 
+        # Create frame for scrollbar + treeview
+        sbar_frame = ttk.Frame(ds_dip_frame)
+
         self.create_label_entry(ds_dip_frame, 'DSpace server:', row=1, column=0, tv=self.ds_host)
 
         # dspace_password = self.create_label_entry(f1, 'DSpace password:', row=row_count)
@@ -609,24 +734,25 @@ class Application(tk.Frame):
         ttk.Button(ds_dip_frame,
                    text="Load DSpace hierarchy",
                    command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_frame]))\
-            .grid(row=2,
-                  column=0,
-                  columnspan=2,
-                  padx=(10, 5),
-                  pady=self.y_pad,
-                  sticky=tk.E)
+            .grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
 
         # Content for DSpace DIP tree panel
-        ds_dip_frame = ttk.Treeview(ds_dip_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
+        ds_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
                                     displaycolumns='Name')
-        ds_dip_frame.column("#0", minwidth=0, width=400)
+        ds_dip_tree.column("#0", minwidth=0, width=400)
         # ds_dip_frame.column("Name", minwidth=0, width=300)
-        ds_dip_frame.bind("<Button-1>", self.on_click)
-        ds_dip_frame.grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        ds_dip_tree.bind("<Button-1>", self.on_click)
+        ds_dip_tree.pack(side=tk.LEFT) #grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
 
-        self.metadata.append(('ds_dip_collection', ds_dip_frame))
+        vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=ds_dip_tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)  # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        sbar_frame.grid(row=0, column=0, columnspan=3)
 
-    def create_metadata_frame(self, metadata_frame):
+        ds_dip_tree.configure(yscrollcommand=vsb.set)
+
+        self.metadata.append(('ds_dip_collection', ds_dip_tree))
+
+    '''def create_metadata_frame(self, metadata_frame):
         self.metadata_tree = ttk.Treeview(metadata_frame, selectmode='browse', columns=('#1', '#2'), show=["headings"])
         # tree.bind("<<TreeviewSelect>>", self.treeview)
         self.metadata_tree.grid(row=3, column=0, columnspan=2, rowspan=2, pady=self.y_pad)
@@ -688,70 +814,56 @@ class Application(tk.Frame):
                   column=2,
                   padx=(5, 10),
                   pady=self.y_pad,
-                  sticky=tk.W)
+                  sticky=tk.W)'''
 
-    def create_submit_frame(self, master, submit_frame):
-        self.row_count = 0
+    def create_select_frame(self, master, submit_frame):
+        # Create frame for scrollbar + treeview
+        sbar_frame = ttk.Frame(submit_frame)
 
-        self.contents_tree = ttk.Treeview(submit_frame,
-                                          selectmode='browse',
-                                          columns=('#1', '#2'),
-                                          displaycolumns=('#1', '#2'))
-        #                                   show=["headings"])
-        # tree.bind("<<TreeviewSelect>>", self.treeview)
+        # List of files
+        self.contents_tree = ttk.Treeview(sbar_frame, selectmode='browse', columns=('#1', '#2'), displaycolumns=('#1', '#2'))
 
-        # tree.heading("#0", text="dcterm")
         self.contents_tree.column("#0", minwidth=0, width=0)
         # self.contents_tree.heading("#1", text="name")
         self.contents_tree.column("#1", minwidth=0, width=0)
         self.contents_tree.column("#2", minwidth=0, width=600)
-        self.contents_tree.grid(row=self.row_count, column=0, columnspan=3, pady=self.y_pad)
+        self.contents_tree.pack(side=tk.LEFT) # grid(row=self.row_count, column=0, columnspan=3, pady=self.y_pad)
         # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
-        # self.contents_tree.heading("#0", text="value")
-        # self.contents_tree.column("#0", minwidth=0, width=200)
         # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
-        # self.metadata_tree.bind("<Button-1>", (lambda x: self.on_click2(x, dcterms_combo, dcterms_value)))
 
-        # self.add_metadata(tree, 'dc.title', 'A transfer title')
+        vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=self.contents_tree.yview)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y) # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        sbar_frame.grid(row=0, column=0, columnspan=3)
 
-        self.row_count += 1
+        self.contents_tree.configure(yscrollcommand=vsb.set)
 
-        ttk.Button(submit_frame,
-                   text='Edit item metadata',
-                   command=lambda: self.edit_metadata(self.contents_tree)) \
-            .grid(row=self.row_count,
+        ttk.Button(submit_frame, text='Edit item metadata',
+                   command=lambda: self.edit_metadata(self.contents_tree)).grid(row=1,
                   column=0,
                   columnspan=3,
                   padx=(5, 10),
                   pady=self.y_pad,
                   sticky=tk.E)
 
-        self.row_count += 1
-
         ttk.Button(submit_frame,
                    text='Select input directory',
-                   command=lambda: self._get_directory(self.input_dir, self.input_dir.label)) \
-            .grid(row=self.row_count, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
+                   command=lambda: self._get_directory(self.input_dir)) \
+            .grid(row=2, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
 
-        self.input_dir = ttk.Entry(submit_frame,
-                                   width=40,
-                                   font=self.main_input_font,
-                                   validate="focusout",
-                                   validatecommand=self._validate_input_dir)
-        self.input_dir.grid(row=self.row_count, column=1, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Entry(submit_frame, width=40, font=self.main_input_font, textvariable=self.input_dir,
+                  validate="focusout",
+                  validatecommand=self._validate_input_dir).grid(row=2, column=1, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
         self.input_dir.label = ttk.Label(submit_frame, text='?', width=22, font=self.main_label_font)
-        self.input_dir.label.grid(row=self.row_count, column=2, padx=(0, 10), pady=self.y_pad, sticky=tk.W)
+        self.input_dir.label.grid(row=2, column=2, padx=(0, 10), pady=self.y_pad, sticky=tk.W)
         # self.non_empties.append(self.input_dir)
 
-        self.row_count += 1
 
         ttk.Button(submit_frame,
                    text='Select output directory',
                    command=lambda: self._get_directory(self.output_dir)) \
-            .grid(row=self.row_count, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
+            .grid(row=3, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
 
-        self.output_dir = ttk.Entry(submit_frame, width=40, font=self.main_input_font)
-        self.output_dir.grid(row=self.row_count, column=1, columnspan=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Entry(submit_frame, width=40, textvariable=self.output_dir, font=self.main_input_font).grid(row=3, column=1, columnspan=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
         self.non_empties.append(self.output_dir)
 
 
