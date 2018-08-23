@@ -16,6 +16,8 @@ import datetime
 import requests
 
 from urllib.parse import urlparse
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # TODO
 # Fix hidden values in treeview
@@ -33,63 +35,57 @@ from urllib.parse import urlparse
 
 # Create package but not start transfer?
 
+# Form item styling
+MAIN_LABEL_FONT = ('Helvetica', 13)
+MAIN_LABEL_FONT_BOLD = ('Helvetica', 13, 'bold')
+MAIN_INPUT_FONT = ('Helvetica', 12)
+MAIN_LABEL_WIDTH = 16
+Y_PAD = 8
+X_PAD = 5
+
+DC_TERMS = ['dc.contributor.advisor', 'dc.contributor.author', 'dc.contributor.editor',
+            'dc.contributor.illustrator', 'dc.contributor.other', 'dc.contributor', 'dc.coverage.spatial',
+            'dc.coverage.temporal', 'dc.creator', 'dc.date.accessioned', 'dc.date.available',
+            'dc.date.copyright', 'dc.date.created', 'dc.date.issued', 'dc.date.submitted',
+            'dc.date.updated', 'dc.date', 'dc.description.abstract', 'dc.description.provenance',
+            'dc.description.sponsorship', 'dc.description.statementofresponsibility',            
+            'dc.description.tableofcontents', 'dc.description.uri', 'dc.description.version',
+            'dc.description', 'dc.format.extent', 'dc.format.medium', 'dc.format.mimetype', 'dc.format',
+            'dc.identifier.citation', 'dc.identifier.govdoc', 'dc.identifier.isbn', 'dc.identifier.ismn',
+            'dc.identifier.issn', 'dc.identifier.other', 'dc.identifier.sici', 'dc.identifier.slug',
+            'dc.identifier.uri', 'dc.identifier', 'dc.language.iso', 'dc.language.rfc3066', 'dc.language',
+            'dc.provenance', 'dc.publisher', 'dc.relation.haspart', 'dc.relation.hasversion',
+            'dc.relation.isbasedon', 'dc.relation.isformatof', 'dc.relation.ispartof',
+            'dc.relation.ispartofseries', 'dc.relation.isreferencedby', 'dc.relation.isreplacedby',
+            'dc.relation.isversionof', 'dc.relation.replaces', 'dc.relation.requires', 'dc.relation.uri',
+            'dc.relation', 'dc.rights.holder', 'dc.rights.license', 'dc.rights.uri', 'dc.rights',
+            'dc.source.uri', 'dc.source', 'dc.subject.classification', 'dc.subject.ddc', 'dc.subject.lcc',
+            'dc.subject.lcsh', 'dc.subject.mesh', 'dc.subject.other', 'dc.subject', 'dc.title.alternative',
+            'dc.title', 'dc.type']
+
 
 class MetadataWindow(tk.Toplevel):
     def __init__(self, root=None, part=None):
         super().__init__()
-        #self.protocol("WM_DELETE_WINDOW", lambda: self)
         self.root = root
 
         if part:
-            #root.item_metadata.append(part)
-            #print(root.item_metadata)
-            #self.get_metadata(part)
             self.json_object = part
         else:
             self.json_object = {**self.root._generate_json(), **self.root.package_metadata_extra}
 
-        self.dcterms = ['dc.contributor.advisor', 'dc.contributor.author', 'dc.contributor.editor',
-                        'dc.contributor.illustrator', 'dc.contributor.other', 'dc.contributor', 'dc.coverage.spatial',
-                        'dc.coverage.temporal', 'dc.creator', 'dc.date.accessioned', 'dc.date.available',
-                        'dc.date.copyright', 'dc.date.created', 'dc.date.issued', 'dc.date.submitted',
-                        'dc.date.updated', 'dc.date', 'dc.description.abstract', 'dc.description.provenance',
-                        'dc.description.sponsorship', 'dc.description.statementofresponsibility',
-                        'dc.description.tableofcontents', 'dc.description.uri', 'dc.description.version',
-                        'dc.description', 'dc.format.extent', 'dc.format.medium', 'dc.format.mimetype', 'dc.format',
-                        'dc.identifier.citation', 'dc.identifier.govdoc', 'dc.identifier.isbn', 'dc.identifier.ismn',
-                        'dc.identifier.issn', 'dc.identifier.other', 'dc.identifier.sici', 'dc.identifier.slug',
-                        'dc.identifier.uri', 'dc.identifier', 'dc.language.iso', 'dc.language.rfc3066', 'dc.language',
-                        'dc.provenance', 'dc.publisher', 'dc.relation.haspart', 'dc.relation.hasversion',
-                        'dc.relation.isbasedon', 'dc.relation.isformatof', 'dc.relation.ispartof',
-                        'dc.relation.ispartofseries', 'dc.relation.isreferencedby', 'dc.relation.isreplacedby',
-                        'dc.relation.isversionof', 'dc.relation.replaces', 'dc.relation.requires', 'dc.relation.uri',
-                        'dc.relation', 'dc.rights.holder', 'dc.rights.license', 'dc.rights.uri', 'dc.rights',
-                        'dc.source.uri', 'dc.source', 'dc.subject.classification', 'dc.subject.ddc', 'dc.subject.lcc',
-                        'dc.subject.lcsh', 'dc.subject.mesh', 'dc.subject.other', 'dc.subject', 'dc.title.alternative',
-                        'dc.title', 'dc.type']
-
         self.controls_frame = self.dcterm = self.dcterm_value = None
 
-        self.metadata_delete = []
-
-        # Form item styling
-        self.main_label_width = 16
-        self.main_label_font = ('Helvetica', 12)
-        self.main_label_font_bold = ('Helvetica', 12, 'bold')
-        self.main_input_font = ('Helvetica', 10)
-        self.y_pad = 8
+        # self.metadata_delete = []
 
         # Background color manually set because themed style doesn't for some reason
         self.configure(background='#F0F0F0')
-
-        #self.json_object = json_object
 
         if self.json_object['parts'] == 'objects/':
             self.title('Edit package metadata')
         else:
             self.title(self.json_object['parts'])
 
-        #print(self.json_object)
         n_f = ttk.Frame(self)
         self.m_f = ttk.Frame(n_f)
         self.list_metadata(self.m_f)
@@ -97,23 +93,16 @@ class MetadataWindow(tk.Toplevel):
         self.position_metadata_controls(n_f)
         n_f.pack()
 
-    def get_metadata(self, part):
-        print(part)
-
     def save(self):
-        for json_property in self.metadata_delete:
-            del self.root.package_metadata_extra[json_property]
+        # for json_property in self.metadata_delete:
+        #    del self.root.package_metadata_extra[json_property]
 
         for json_property in self.json_object:
             if isinstance(self.json_object[json_property], tk.StringVar):
                 self.json_object[json_property] = self.json_object[json_property].get()
-                #print("1: " + self.json_object[json_property].get())
-            #print(json_property)
-            #self.json_object[json_property] = json_property.get()
 
-        if self.title != 'Edit package metadata':
+        if self.title() != 'Edit package metadata':
             self.root.item_metadata.append(self.json_object)
-            #print(self.title())
         else:
             del self.json_object['parts']
             del self.json_object['dc.title']
@@ -121,11 +110,10 @@ class MetadataWindow(tk.Toplevel):
             del self.json_object['dc.description.provenance']
             del self.json_object['dc.date.issued']
             self.root.package_metadata_extra = self.json_object
-            #print(self.root.package_metadata_extra)
 
-        print(self.root.item_metadata)
-        print(self.root.package_metadata)
-        print(self.root.package_metadata_extra)
+        # print(self.root.item_metadata)
+        # print(self.root.package_metadata)
+        # print(self.root.package_metadata_extra)
         self.destroy()
 
     def add_metadata(self):
@@ -134,85 +122,85 @@ class MetadataWindow(tk.Toplevel):
         elif self.dcterm.get() not in self.json_object:
             tv = tk.StringVar()
             fr = ttk.Frame(self.m_f)
-            ttk.Label(fr, text=self.dcterm.get(), width=20, font=self.main_label_font, anchor=tk.E).pack(side=tk.LEFT)
+            ttk.Label(fr, text=self.dcterm.get() + ': ', width=20, font=MAIN_LABEL_FONT, anchor=tk.E)\
+                .pack(side=tk.LEFT, pady=Y_PAD)
 
             if 'description' in self.dcterm.get():
-                tk.Text(fr, width=40, height=4, font=self.main_input_font).pack()
+                tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT).pack(side=tk.LEFT, pady=Y_PAD)
             else:
-                ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=tv).pack(side=tk.LEFT)
+                ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv).pack(side=tk.LEFT, pady=Y_PAD)
 
-            ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT)
+            ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT, pady=Y_PAD, padx=X_PAD)
             tv.set(self.dcterm_value.get())
             self.json_object[self.dcterm.get()] = tv
-            fr.pack() # grid(row=self.metadata_entries)
+            fr.pack(pady=Y_PAD)  # grid(row=self.metadata_entries)
         else:
             messagebox.showerror('Error', 'Property {} already exists'.format(self.dcterm.get()))
 
-        # self.json_object[self.dcterm.get()] = self.dcterm_value.get()
-        print(self.json_object)
-
-        #self.list_metadata(None)
-        #self.position_metadata_controls(None)
+        # print(self.json_object)
 
     def list_metadata(self, contents_frame):
-        #contents_frame = self
         for json_property in self.json_object:
-            if not (json_property == 'parts' or (self.json_object['parts'] == 'objects/' and json_property == 'dc.description.provenance')):
+            if not (json_property == 'parts' or
+                    (self.json_object['parts'] == 'objects/' and json_property == 'dc.description.provenance')):
+
                 tv = tk.StringVar()
                 fr = ttk.Frame(contents_frame)
-                ttk.Label(fr, text=json_property, width=20, font=self.main_label_font, anchor=tk.E).pack(side=tk.LEFT)
+                ttk.Label(fr, text=json_property + ': ', width=20, font=MAIN_LABEL_FONT, anchor=tk.E)\
+                    .pack(side=tk.LEFT, pady=Y_PAD)
 
                 if 'description' in json_property:
-                    tk.Text(fr, width=40, height=4, font=self.main_input_font)
+                    tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT)
                 else:
                     if self.json_object['parts'] == 'objects/':
                         if json_property == 'dc.title':
-                            ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=self.root.package_title).pack(side=tk.LEFT)
+                            ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=self.root.package_title)\
+                                .pack(side=tk.LEFT, pady=Y_PAD)
                         elif json_property == 'dc.date.issued':
-                            ttk.Entry(fr, width=40, font=self.main_input_font,
-                                      textvariable=self.root.package_date).pack(side=tk.LEFT)
+                            ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT,
+                                      textvariable=self.root.package_date).pack(side=tk.LEFT, pady=Y_PAD)
                         elif json_property == 'dc.creator':
-                            ttk.Entry(fr, width=40, font=self.main_input_font,
-                                      textvariable=self.root.package_author).pack(side=tk.LEFT)
+                            ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT,
+                                      textvariable=self.root.package_author).pack(side=tk.LEFT, pady=Y_PAD)
                         else:
-                            ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=tv).pack(side=tk.LEFT)
+                            ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv)\
+                                .pack(side=tk.LEFT, pady=Y_PAD)
 
                     else:
-                        ttk.Entry(fr, width=40, font=self.main_input_font, textvariable=tv).pack(side=tk.LEFT)
+                        ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv).pack(side=tk.LEFT, pady=Y_PAD)
 
                 if json_property != 'dc.title' and json_property != 'dc.date.issued' and json_property != 'dc.creator':
-                    ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT)
+                    ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT, pady=Y_PAD, padx=X_PAD)
 
                 tv.set(self.json_object[json_property])
                 self.json_object[json_property] = tv
-                fr.pack() # grid(row=self.metadata_entries)
-                # self.metadata_entries += 1
+                fr.pack(pady=Y_PAD)
 
-        # print(self.json_object)
-        # print(self.metadata_entries)
         # sep = ttk.Separator(contents_frame, orient=tk.HORIZONTAL).pack()
-        # sep.pack() # grid(row=self.row_count, column=0, columnspan=3, pady=self.y_pad, sticky=tk.EW)
+        # sep.pack() # grid(row=self.row_count, column=0, columnspan=3, pady=Y_PAD, sticky=tk.EW)
 
     def position_metadata_controls(self, controls_frame):
-        #self.controls_frame = ttk.Frame()
         fr = ttk.Frame(controls_frame)
 
-        ttk.Label(fr, text='DC Terms:', width=10, font=self.main_label_font).grid(row=0, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
+        ttk.Label(fr, text='DC Terms:', width=10, font=MAIN_LABEL_FONT)\
+            .grid(row=0, column=0, padx=(10, 0), pady=Y_PAD, sticky=tk.E)
 
         self.dcterm = tk.StringVar()
-        ttk.Combobox(fr, width=50, font=self.main_input_font, values=self.dcterms, textvariable=self.dcterm).grid(row=0, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
-        ttk.Button(fr, text='Add', command=self.add_metadata).grid(row=0, column=2, rowspan=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Combobox(fr, width=50, font=MAIN_INPUT_FONT, values=DC_TERMS, textvariable=self.dcterm)\
+            .grid(row=0, column=1, padx=(5, 5), pady=Y_PAD, sticky=tk.W)
+        ttk.Button(fr, text='Add', command=self.add_metadata)\
+            .grid(row=0, column=2, rowspan=2, padx=(5, 10), pady=Y_PAD, sticky=tk.W)
 
         self.dcterm_value = tk.StringVar()
-        ttk.Entry(fr, width=50, font=self.main_input_font, textvariable=self.dcterm_value).grid(row=1, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.E)
+        ttk.Entry(fr, width=50, font=MAIN_INPUT_FONT, textvariable=self.dcterm_value)\
+            .grid(row=1, column=0, columnspan=2, padx=(5, 5), pady=Y_PAD, sticky=tk.E)
 
-        fr.pack() # grid(row=self.metadata_entries + 1)
+        fr.pack()
 
         fr = ttk.Frame(controls_frame)
-        ttk.Button(fr, text='Save', command=self.save).pack(side=tk.LEFT)  # .grid(row=2, column=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
-        ttk.Button(fr, text='Cancel', command=self.destroy).pack(side=tk.LEFT)  # .grid(row=2, column=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
-        fr.pack() # grid(row=self.metadata_entries + 2)
-        #self.controls_frame.pack()
+        ttk.Button(fr, text='Save', command=self.save).pack(side=tk.LEFT, pady=Y_PAD)
+        ttk.Button(fr, text='Cancel', command=self.destroy).pack(side=tk.LEFT, pady=Y_PAD)
+        fr.pack()
 
 
 class Application(tk.Frame):
@@ -244,18 +232,10 @@ class Application(tk.Frame):
 
         self.non_empties = []
 
-        # Form item styling
-        self.main_label_width = 16
-        self.main_label_font = ('Helvetica', 12)
-        self.main_label_font_bold = ('Helvetica', 12, 'bold')
-        self.main_input_font = ('Helvetica', 10)
-        self.y_pad = 8
-
         self.metadata_tree = self.contents_tree = self.md_window = None
         
         self.create_menu(master)
         self.create_widgets(master)
-        print(self.package_metadata)
 
     # Helper methods
 
@@ -271,25 +251,25 @@ class Application(tk.Frame):
                 self.md_window = MetadataWindow(self)
             else:
                 self.md_window = MetadataWindow(self, part)
-        #print(self.md_window.json_object)
 
-    def do_nothing(self):
+    @staticmethod
+    def do_nothing():
         pass
 
-    def create_label_entry(self, parent_obj, text, column=0, row=0, tv=None, entry_width=50):
+    @staticmethod
+    def create_label_entry(parent_obj, text, column=0, row=0, tv=None, entry_width=50):
         ttk.Label(parent_obj, text=text,
-                  width=self.main_label_width+10,
-                  font=self.main_label_font,
+                  width=MAIN_LABEL_WIDTH+10,
+                  font=MAIN_LABEL_FONT,
                   anchor=tk.E)\
             .grid(row=row,
                   column=column,
                   padx=(10, 0),
                   sticky=tk.W,
-                  pady=self.y_pad)
+                  pady=Y_PAD)
 
-        entry_object = ttk.Entry(parent_obj, width=entry_width, textvariable=tv, font=self.main_label_font)
-        #entry_object.insert('0', tv)
-        entry_object.grid(row=row, column=column+1, padx=(0, 10), pady=self.y_pad, sticky=tk.W)
+        entry_object = ttk.Entry(parent_obj, width=entry_width, textvariable=tv, font=MAIN_LABEL_FONT)
+        entry_object.grid(row=row, column=column+1, padx=(0, 10), pady=Y_PAD, sticky=tk.W)
 
         return entry_object
 
@@ -319,8 +299,6 @@ class Application(tk.Frame):
             return tree.insert('', index='end', values=(dc_terms, dc_terms_value))
 
     def edit_metadata(self, tree):
-        #for item_name in tree.selection():
-        #print(list(tree.item(tree.selection()).items())[2][1][1])'
         if tree.selection():
             part = list(tree.item(tree.selection()).items())[2][1][1]
             found = False
@@ -328,26 +306,14 @@ class Application(tk.Frame):
             for item in self.item_metadata:
                 if item['parts'] == part:
                     self.item_metadata.remove(item)
-                    print(item)
+                    # print(item)
                     self.open_metadata_window(item)
-                    #print(self.item_metadata.pop(item))
                     found = True
                     break
 
             if not found:
-                print({ 'parts': part })
-                self.open_metadata_window({ 'parts': part })
-
-        #self.open_metadata_window()
-        #    for v in tree.item(item_name).items():
-        #        print(v[1])
-            #tree.item(item_name, values=(dc_terms_combobox.get(), dc_terms_value.get()))
-
-    @staticmethod
-    def delete_metadata(tree):
-        for item_name in tree.selection():
-            pass
-            #tree.delete(item_name)
+                # print({'parts': part})
+                self.open_metadata_window({'parts': part})
 
     # Connect to ArchivesSpace
 
@@ -365,13 +331,12 @@ class Application(tk.Frame):
             output = response.json()
         except Exception:
             print(response.content)
-            raise Exception(
-                "ArchivesSpace server responded with status {}, but returned a non-JSON document".format(
-                    response.status_code))
+            raise Exception("ArchivesSpace server responded with status {}, but returned a non-JSON document"
+                            .format(response.status_code))
 
         if 'error' in output:
-            raise Exception(
-                "Unable to log into ArchivesSpace.\n\n{}\n\nAre the user name and password correct?".format(output['error']))
+            raise Exception("Unable to log into ArchivesSpace.\n\n{}\n\nAre the user name and password correct?"
+                            .format(output['error']))
         else:
             token = output['session']
 
@@ -383,7 +348,7 @@ class Application(tk.Frame):
     def request_from_as(host, method, url, params, expected_response, data=None):
         if not url.startswith('/'):
             url = '/' + url
-        # print(host + url)
+
         response = method(host + url, params=params, data=data)
         if response.status_code != expected_response:
             print('Response code: %s', response.status_code)
@@ -393,13 +358,11 @@ class Application(tk.Frame):
         try:
             output = response.json()
         except Exception:
-            raise Exception("ArchivesSpace server responded with status {}, but returned a non-JSON document".format(
-                response.status_code))
+            raise Exception("ArchivesSpace server responded with status {}, but returned a non-JSON document"
+                            .format(response.status_code))
 
         if 'error' in output:
             raise Exception(output['error'])
-
-        # print(json.dumps(response.json(), indent=4, sort_keys=True))
 
         return response
 
@@ -426,10 +389,12 @@ class Application(tk.Frame):
             url = '/repositories/' + self.as_repo.get() + '/resources'
 
             try:
-                resources = self.request_from_as(self._get_base_url(base_url), session.get, url, {'all_ids': True}, 200).json()
+                resources = self.request_from_as(self._get_base_url(base_url), session.get, url,
+                                                 {'all_ids': True}, 200).json()
 
                 for r in resources:
-                    as_tree = self.request_from_as(self._get_base_url(base_url), session.get, url + '/' + str(r) + '/tree', {}, 200).json()
+                    as_tree = self.request_from_as(self._get_base_url(base_url), session.get,
+                                                   url + '/' + str(r) + '/tree', {}, 200).json()
                     self.traverse_tree(tree, [as_tree])
             except Exception as e:
                 errortext = ''
@@ -439,12 +404,11 @@ class Application(tk.Frame):
                 messagebox.showerror('Error', 'Could not access ArchivesSpace.{}'.format(errortext))
 
     def traverse_tree(self, tree, as_tree, parent_obj=''):
-        # print(as_tree)
         obj = None
         for node in as_tree:
-            # print(node)
             if 'title' in node:
-                obj = tree.insert(parent_obj, index='end', text=node['title'], tags='archival_object', values=node['id'])
+                obj = tree.insert(parent_obj, index='end', text=node['title'],
+                                  tags='archival_object', values=node['id'])
 
             if 'children' in node:
                 self.traverse_tree(tree, node['children'], obj)
@@ -453,20 +417,15 @@ class Application(tk.Frame):
 
     def _walk_community(self, communities, tree, parent_obj=''):
         for c in communities:
-            # print("C: " + str(c))
             obj = tree.insert(parent_obj, index='end', text=c.get('name'))
 
             for co in c.get('collection'):
                 tree.insert(obj, index='end', text=co.get('name'), tags='collection', values=co['id'])
-                # print("Co: " + str(co))
 
             if len(c.get('community')) > 0:
-                # print("Recursive")
                 self._walk_community(c.get('community'), tree, obj)
 
     def _populate_dspace_tree(self, trees):
-        response = None
-
         try:
             response = requests.get(self.ds_host.get() + '/rest/hierarchy', verify=False)
             c = response.json().get('community')
@@ -475,8 +434,8 @@ class Application(tk.Frame):
             for t in trees:
                 t.delete(*t.get_children())
                 self._walk_community(c, t)
-                t.tag_configure('collection', font=self.main_label_font_bold)
-        except requests.exceptions.ConnectionError as e:
+                t.tag_configure('collection', font=MAIN_LABEL_FONT_BOLD)
+        except requests.exceptions.ConnectionError:
             messagebox.showerror('Error', 'Could not access DSpace.\n\nIs the DSpace server URL correct?')
 
     # Controller methods
@@ -492,11 +451,10 @@ class Application(tk.Frame):
             try:
                 for root, dirs, files in os.walk(directory):
                     for name in files:
-                        #print(root[len(directory):])
-                        #print(dirs)
                         total_size += os.path.getsize(os.path.join(root, name))
                         # 1 added because else space in file name gets cut off
-                        self.contents_tree.insert('', index='end', values=('1', str('...' + root[len(directory):] + '/' + name)))
+                        self.contents_tree.insert('', index='end',
+                                                  values=('1', str('...' + root[len(directory):] + '/' + name)))
                     total_files += len(files)
             except Exception as e:
                 messagebox.showerror('Error', "Could not estimate total number and size of files in " + directory)
@@ -505,14 +463,10 @@ class Application(tk.Frame):
         return total_files, total_size
 
     def _validate_input_dir(self):
-        # print(self._check_empty(self.input_dir))
         if self._check_empty(self.input_dir):
             for subdir, dirs, files in os.walk(self.input_dir.get()):
                 for file in files:
                     full_filename = os.path.join(subdir, file)
-                    print(full_filename)
-
-            # self.input_dir.label.config(text=total_size)
 
     def _generate_json(self):
         json_obj = { 'parts': 'objects/',
@@ -527,9 +481,10 @@ class Application(tk.Frame):
                 t_item = json_property[1].item(json_property[1].focus())
                 # print(p[1].item(p[1].focus()))
                 try:
-                    json_obj[json_property[0]] = str(t_item['values'][0]) # Converting all values to string
+                    json_obj[json_property[0]] = str(t_item['values'][0])  # Converting all values to string
                 except IndexError as e:
-                    print('Index out of range ' + str(e))
+                    pass
+                    # print('Index out of range ' + str(e))
             else:
                 print(json_property)
 
@@ -558,6 +513,10 @@ class Application(tk.Frame):
         return True
 
     def _reset(self):
+        '''print("Package metadata extra:" + str(self.package_metadata_extra))
+        print("Package metadata: " + str(self.package_metadata))
+        print("Item:" + str(self.item_metadata))
+        '''
         for p in self.inputs:
             p.set('')
 
@@ -572,7 +531,6 @@ class Application(tk.Frame):
         if self._check_errors(self.non_empties) and \
                 messagebox.askokcancel("Confirm transfer?",
                                        "Do you want to start this transfer?\n" + self.input_dir.label.cget("text")):
-            # self._generate_json()
             self._copy_directory()
             # self._reset()
 
@@ -598,7 +556,7 @@ class Application(tk.Frame):
         directory = tk.filedialog.askdirectory()
 
         if directory:
-            text_obj.set(directory) #insert(tk.END, directory)
+            text_obj.set(directory)
 
         if hasattr(text_obj, 'label'):
             # If tree is already populated then delete
@@ -656,7 +614,7 @@ class Application(tk.Frame):
 
         self.create_dspace_widgets(ds_aip_frame, ds_dip_frame)
         self.create_as_frame(as_dip_frame)
-        self.create_select_frame(master, submit_frame)
+        self.create_select_frame(submit_frame)
 
         # Controls frame
         controls_frame = ttk.Frame(master)
@@ -667,57 +625,59 @@ class Application(tk.Frame):
 
     def create_package_form(self, package_frame):
         # Package title entry
-        ttk.Label(package_frame, text='Package title:', width=self.main_label_width, font=self.main_label_font,
-                  anchor=tk.E).grid(row=0, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
+        ttk.Label(package_frame, text='Package title:', width=MAIN_LABEL_WIDTH, font=MAIN_LABEL_FONT,
+                  anchor=tk.E).grid(row=0, column=0, padx=(10, 0), pady=Y_PAD, sticky=tk.E)
 
         ttk.Entry(package_frame, width=40, font=('Helvetica', 16), validate="focusout",
-                  textvariable=self.package_title,
-                  validatecommand=lambda: print(self.package_title.get())).grid(row=0, column=1, padx=(0, 10),
-                                                                                pady=self.y_pad, columnspan=2,
-                                                                                sticky=tk.W)
+                  textvariable=self.package_title, validatecommand=self.do_nothing)\
+            .grid(row=0, column=1, padx=(0, 10),
+                  pady=Y_PAD, columnspan=2,
+                  sticky=tk.W)
 
         self.package_metadata.append(('dc.title', self.package_title))
         # self.non_empties.append(package_title)
 
         # Date entry
-        ttk.Label(package_frame, text='Date:', width=self.main_label_width, font=self.main_label_font,
-                  anchor=tk.E).grid(row=1, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
+        ttk.Label(package_frame, text='Date:', width=MAIN_LABEL_WIDTH, font=MAIN_LABEL_FONT,
+                  anchor=tk.E).grid(row=1, column=0, padx=(10, 0), pady=Y_PAD, sticky=tk.E)
 
-        ttk.Entry(package_frame, width=10, font=self.main_input_font, validate="focusout",
+        ttk.Entry(package_frame, width=10, font=MAIN_INPUT_FONT, validate="focusout",
                   textvariable=self.package_date,
-                  validatecommand=lambda: self._check_empty(self.package_date)).grid(row=1, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+                  validatecommand=lambda: self._check_empty(self.package_date))\
+            .grid(row=1, column=1, padx=(5, 5), pady=Y_PAD, sticky=tk.W)
 
-        ttk.Label(package_frame, text='(DD/MM/YYYY)', width=22, font=self.main_label_font,
-                  anchor=tk.W).grid(row=1, column=2, padx=(0, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Label(package_frame, text='(DD/MM/YYYY)', width=22, font=MAIN_LABEL_FONT,
+                  anchor=tk.W).grid(row=1, column=2, padx=(0, 10), pady=Y_PAD, sticky=tk.W)
 
         self.package_metadata.append(('dc.date.issued', self.package_date))
 
         # Author entry
-        ttk.Label(package_frame, text='Author:', width=self.main_label_width, font=self.main_label_font,
-                  anchor=tk.E).grid(row=2, column=0, padx=(10, 0), pady=self.y_pad, sticky=tk.E)
+        ttk.Label(package_frame, text='Author:', width=MAIN_LABEL_WIDTH, font=MAIN_LABEL_FONT,
+                  anchor=tk.E).grid(row=2, column=0, padx=(10, 0), pady=Y_PAD, sticky=tk.E)
 
-        ttk.Entry(package_frame, width=30, textvariable=self.package_author, font=self.main_input_font).grid(row=2, column=1, padx=(5, 5), pady=self.y_pad, sticky=tk.W, columnspan=2)
+        ttk.Entry(package_frame, width=30, textvariable=self.package_author, font=MAIN_INPUT_FONT)\
+            .grid(row=2, column=1, padx=(5, 5), pady=Y_PAD, sticky=tk.W, columnspan=2)
         self.package_metadata.append(('dc.creator', self.package_author))
 
         # Edit package metadata button
         ttk.Button(package_frame, text='Edit package metadata',
-                   command=self.open_metadata_window).grid(row=3, column=0, columnspan=3, padx=(5, 10),
-                                                 pady=self.y_pad, sticky=tk.E)
+                   command=self.open_metadata_window)\
+            .grid(row=3, column=0, columnspan=3, padx=(5, 10), pady=Y_PAD, sticky=tk.E)
 
     def create_as_frame(self, as_dip_frame):
         sbar_frame = ttk.Frame(as_dip_frame)
 
         # Content for DSpace DIP tree panel
-        as_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
-                                   displaycolumns='Name')
+        as_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree',
+                                   columns=('ID #', 'Name'), displaycolumns='Name')
         as_dip_tree.column("#0", minwidth=0, width=400)
         as_dip_tree.bind("<Button-1>", self.on_click)
-        as_dip_tree.pack(side=tk.LEFT) # grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        as_dip_tree.pack(side=tk.LEFT)
 
         self.package_metadata.append(('archivesspace_dip_collection', as_dip_tree))
 
         vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=as_dip_tree.yview)
-        vsb.pack(side=tk.RIGHT, fill=tk.Y)  # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
         sbar_frame.grid(row=0, column=0, columnspan=3)
 
         as_dip_tree.configure(yscrollcommand=vsb.set)
@@ -730,21 +690,16 @@ class Application(tk.Frame):
         self.create_label_entry(as_dip_frame, 'Password:', row=4, column=0, tv=self.as_password)
 
         ttk.Button(as_dip_frame, text="Load ArchivesSpace hierarchy",
-                   command=lambda: self._populate_as_tree(as_dip_tree)).grid(row=5,
-                                                                             column=0,
-                                                                             columnspan=2,
-                                                                             padx=(10, 5),
-                                                                             pady=self.y_pad,
-                                                                             sticky=tk.E)
-        # as_labelframe.grid(row=2, column=0, pady=self.y_pad)
+                   command=lambda: self._populate_as_tree(as_dip_tree))\
+            .grid(row=5, column=0, columnspan=2, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
     def create_dspace_widgets(self, ds_aip_frame, ds_dip_frame):
         # Create frame for scrollbar + treeview
         sbar_frame = ttk.Frame(ds_aip_frame)
 
         # Content for DSpace AIP tree panel
-        ds_aip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
-                                   displaycolumns='Name')
+        ds_aip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree',
+                                   columns=('ID #', 'Name'), displaycolumns='Name')
         # tree.bind("<<TreeviewSelect>>", self.treeview)
         # tree.pack(expand=tk.YES, fill=tk.BOTH)
         # tree.heading("#0", text="C/C++ compiler")
@@ -755,11 +710,10 @@ class Application(tk.Frame):
         # ds_aip_tree.column('#1', minwidth=0, width=300)
         # ds_aip_tree.column('#2', minwidth=0, width=0)
         ds_aip_tree.bind("<Button-1>", self.on_click)
-        # tree.pack()
-        ds_aip_tree.pack(side=tk.LEFT) #grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        ds_aip_tree.pack(side=tk.LEFT)
 
         vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=ds_aip_tree.yview)
-        vsb.pack(side=tk.RIGHT, fill=tk.Y) # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
         sbar_frame.grid(row=0, column=0, columnspan=3)
 
         ds_aip_tree.configure(yscrollcommand=vsb.set)
@@ -767,17 +721,11 @@ class Application(tk.Frame):
         self.package_metadata.append(('ds_aip_collection', ds_aip_tree))
 
         # Content for DSpace config panel
-        self.create_label_entry(ds_aip_frame, 'DSpace server:', row=1,
-                                column=0, tv=self.ds_host)
+        self.create_label_entry(ds_aip_frame, 'DSpace server:', row=1, column=0, tv=self.ds_host)
 
         ttk.Button(ds_aip_frame, text="Load DSpace hierarchy",
-                   command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_tree])). \
-            grid(row=2,
-                 column=0,
-                 columnspan=2,
-                 padx=(10, 5),
-                 pady=self.y_pad,
-                 sticky=tk.E)
+                   command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_tree])).\
+            grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
         # Do DIP frame
 
@@ -786,12 +734,10 @@ class Application(tk.Frame):
 
         self.create_label_entry(ds_dip_frame, 'DSpace server:', row=1, column=0, tv=self.ds_host)
 
-        # dspace_password = self.create_label_entry(f1, 'DSpace password:', row=row_count)
-        # row_count += 1
         ttk.Button(ds_dip_frame,
                    text="Load DSpace hierarchy",
                    command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_frame]))\
-            .grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
+            .grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
         # Content for DSpace DIP tree panel
         ds_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
@@ -799,10 +745,10 @@ class Application(tk.Frame):
         ds_dip_tree.column("#0", minwidth=0, width=400)
         # ds_dip_frame.column("Name", minwidth=0, width=300)
         ds_dip_tree.bind("<Button-1>", self.on_click)
-        ds_dip_tree.pack(side=tk.LEFT) #grid(row=0, column=0, columnspan=2, padx=(5, 5), pady=self.y_pad, sticky=tk.W)
+        ds_dip_tree.pack(side=tk.LEFT)
 
         vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=ds_dip_tree.yview)
-        vsb.pack(side=tk.RIGHT, fill=tk.Y)  # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
         sbar_frame.grid(row=0, column=0, columnspan=3)
 
         ds_dip_tree.configure(yscrollcommand=vsb.set)
@@ -813,55 +759,54 @@ class Application(tk.Frame):
         sbar_frame = ttk.Frame(submit_frame)
 
         # List of files
-        self.contents_tree = ttk.Treeview(sbar_frame, selectmode='browse', columns=('#1', '#2'), displaycolumns=('#1', '#2'))
+        self.contents_tree = ttk.Treeview(sbar_frame, selectmode='browse',
+                                          columns=('#1', '#2'), displaycolumns=('#1', '#2'))
 
         self.contents_tree.column("#0", minwidth=0, width=0, stretch=tk.NO)
         # self.contents_tree.heading("#1", text="name")
         self.contents_tree.column("#1", minwidth=0, width=0, stretch=tk.NO)
         self.contents_tree.column("#2", minwidth=0, width=600, stretch=tk.NO)
-        self.contents_tree.grid(row=0, column=0, pady=self.y_pad)
+        self.contents_tree.grid(row=0, column=0, pady=Y_PAD)
         # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
         # https://stackoverflow.com/questions/5286093/display-listbox-with-columns-using-tkinter
 
         vsb = ttk.Scrollbar(sbar_frame, orient=tk.VERTICAL, command=self.contents_tree.yview)
-        vsb.grid(row=0, column=1, sticky=tk.N+tk.S+tk.E+tk.W) #pack(side=tk.RIGHT, fill=tk.Y) # place(x=30 + 200 + 2, y=95, height=200 + 20)
+        vsb.grid(row=0, column=1, sticky=tk.N+tk.S+tk.E+tk.W)
         # sbar_frame.grid(row=0, column=0, columnspan=3)
 
         self.contents_tree.configure(yscrollcommand=vsb.set)
         sbar_frame.grid(row=0, column=0, columnspan=3)
 
         ttk.Button(submit_frame, text='Edit item metadata',
-                   command=lambda: self.edit_metadata(self.contents_tree)).grid(row=1,
-                  column=0,
-                  columnspan=3,
-                  padx=(5, 10),
-                  pady=self.y_pad,
-                  sticky=tk.E)
+                   command=lambda: self.edit_metadata(self.contents_tree))\
+            .grid(row=1, column=0,  columnspan=3, padx=(5, 10), pady=Y_PAD, sticky=tk.E)
 
         ttk.Button(submit_frame,
                    text='Select input directory',
                    command=lambda: self._get_directory(self.input_dir)) \
-            .grid(row=2, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
+            .grid(row=2, column=0, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
-        ttk.Entry(submit_frame, width=40, font=self.main_input_font, textvariable=self.input_dir,
+        ttk.Entry(submit_frame, width=40, font=MAIN_INPUT_FONT, textvariable=self.input_dir,
                   validate="focusout",
-                  validatecommand=self._validate_input_dir).grid(row=2, column=1, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
-        self.input_dir.label = ttk.Label(submit_frame, text='?', width=22, font=self.main_label_font)
-        self.input_dir.label.grid(row=2, column=2, padx=(0, 10), pady=self.y_pad, sticky=tk.W)
+                  validatecommand=self._validate_input_dir)\
+            .grid(row=2, column=1, padx=(5, 10), pady=Y_PAD, sticky=tk.W)
+        self.input_dir.label = ttk.Label(submit_frame, text='?', width=22, font=MAIN_LABEL_FONT)
+        self.input_dir.label.grid(row=2, column=2, padx=(0, 10), pady=Y_PAD, sticky=tk.W)
         # self.non_empties.append(self.input_dir)
 
         ttk.Button(submit_frame,
                    text='Select output directory',
                    command=lambda: self._get_directory(self.output_dir)) \
-            .grid(row=3, column=0, padx=(10, 5), pady=self.y_pad, sticky=tk.E)
+            .grid(row=3, column=0, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
-        ttk.Entry(submit_frame, width=40, textvariable=self.output_dir, font=self.main_input_font).grid(row=3, column=1, columnspan=2, padx=(5, 10), pady=self.y_pad, sticky=tk.W)
+        ttk.Entry(submit_frame, width=40, textvariable=self.output_dir, font=MAIN_INPUT_FONT)\
+            .grid(row=3, column=1, columnspan=2, padx=(5, 10), pady=Y_PAD, sticky=tk.W)
         self.non_empties.append(self.output_dir)
 
 
 def main():
     root = tk.Tk()
-    root.title('Archive assistant 0.2')
+    root.title('Archive assistant 0.3')
 
     # Background color manually set because themed style doesn't for some reason
     root.configure(background='#F0F0F0')
