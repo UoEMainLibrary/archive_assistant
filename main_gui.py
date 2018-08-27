@@ -366,6 +366,19 @@ class Application(tk.Frame):
 
         return response
 
+    def logout_from_as(self, host, method):
+        try:
+            response = method(host + '/logout', data={'Example': 'missing'})
+        except requests.ConnectionError as e:
+            raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
+        except Exception as e:
+            raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
+
+        if response.status_code == 200:
+            print('Logged out from ArchivesSpace server.')
+        else:
+            print('Error logging out')
+
     def _populate_as_tree(self, tree):
         base_url = None
         session = None
@@ -402,6 +415,8 @@ class Application(tk.Frame):
                     errortext = '\n\nCould not find repository: {}'.format(self.as_repo.get())
 
                 messagebox.showerror('Error', 'Could not access ArchivesSpace.{}'.format(errortext))
+
+            self.logout_from_as(self._get_base_url(base_url), session.post)
 
     def traverse_tree(self, tree, as_tree, parent_obj=''):
         obj = None
