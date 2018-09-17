@@ -40,9 +40,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # Stage B.3 Onsite Internal Transfer checklist and guidance
 
 # Form item styling
-MAIN_LABEL_FONT = ('Helvetica', 13)
-MAIN_LABEL_FONT_BOLD = ('Helvetica', 13, 'bold')
-MAIN_INPUT_FONT = ('Helvetica', 12)
+FONT_FAMILY = 'Verdana'
+MAIN_LABEL_FONT = (FONT_FAMILY, 12)
+MAIN_LABEL_FONT_BOLD = (FONT_FAMILY, 12, 'bold')
+MAIN_INPUT_FONT = (FONT_FAMILY, 10)
 MAIN_LABEL_WIDTH = 16
 Y_PAD = 8
 X_PAD = 5
@@ -218,8 +219,8 @@ class MetadataWindow(tk.Toplevel):
         fr.pack()
 
         fr = ttk.Frame(controls_frame)
-        ttk.Button(fr, text='Save', command=self.save).pack(side=tk.LEFT, pady=Y_PAD)
-        ttk.Button(fr, text='Cancel', command=self.destroy).pack(side=tk.LEFT, pady=Y_PAD)
+        ttk.Button(fr, text='Save', command=self.save).pack(side=tk.LEFT, pady=Y_PAD, padx=7.5)
+        ttk.Button(fr, text='Cancel', command=self.destroy).pack(side=tk.LEFT, pady=Y_PAD, padx=7.5)
         fr.pack()
 
 
@@ -284,17 +285,17 @@ class Application(tk.Frame):
     @staticmethod
     def create_label_entry(parent_obj, text, column=0, row=0, tv=None, entry_width=50):
         ttk.Label(parent_obj, text=text,
-                  width=MAIN_LABEL_WIDTH+10,
+                  # width=MAIN_LABEL_WIDTH,
                   font=MAIN_LABEL_FONT,
                   anchor=tk.E)\
             .grid(row=row,
                   column=column,
-                  padx=(10, 0),
-                  sticky=tk.W,
+                  # padx=(10, 0),
+                  sticky=tk.E,
                   pady=Y_PAD)
 
         entry_object = ttk.Entry(parent_obj, width=entry_width, textvariable=tv, font=MAIN_LABEL_FONT)
-        entry_object.grid(row=row, column=column+1, padx=(0, 10), pady=Y_PAD, sticky=tk.W)
+        entry_object.grid(row=row, column=column+1, pady=Y_PAD, sticky=tk.W)
 
         return entry_object
 
@@ -719,20 +720,20 @@ class Application(tk.Frame):
 
         vsb = ttk.Scrollbar(sbar_frame, orient="vertical", command=as_dip_tree.yview)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
-        sbar_frame.grid(row=0, column=0, columnspan=3)
+        sbar_frame.grid(row=0, column=0, columnspan=4)
 
         as_dip_tree.configure(yscrollcommand=vsb.set)
 
         # as_labelframe = ttk.Labelframe(as_dip_frame, text='ArchivesSpace config')
 
-        self.create_label_entry(as_dip_frame, 'Server URL:', row=1, column=0, tv=self.as_host)
-        self.create_label_entry(as_dip_frame, 'Repository:', row=2, column=0, tv=self.as_repo)
-        self.create_label_entry(as_dip_frame, 'Username:', row=3, column=0, tv=self.as_user)
-        self.create_label_entry(as_dip_frame, 'Password:', row=4, column=0, tv=self.as_password)
+        self.create_label_entry(as_dip_frame, 'Server URL:', row=1, column=0, tv=self.as_host, entry_width=25)
+        self.create_label_entry(as_dip_frame, 'Repository:', row=1, column=2, tv=self.as_repo, entry_width=5)
+        self.create_label_entry(as_dip_frame, 'Username:', row=2, column=0, tv=self.as_user, entry_width=25)
+        self.create_label_entry(as_dip_frame, 'Password:', row=2, column=2, tv=self.as_password, entry_width=25)
 
         ttk.Button(as_dip_frame, text="Load ArchivesSpace hierarchy",
                    command=lambda: self._populate_as_tree(as_dip_tree))\
-            .grid(row=5, column=0, columnspan=2, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
+            .grid(row=3, column=0, columnspan=4, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
     def create_dspace_widgets(self, ds_aip_frame, ds_dip_frame):
         # Create frame for scrollbar + treeview
