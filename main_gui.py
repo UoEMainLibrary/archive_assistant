@@ -35,6 +35,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Create package but not start transfer?
 
+# TEXTAREA NOT WORKING PROPERLY
+
+# Stage B.3 Onsite Internal Transfer checklist and guidance
+
 # Form item styling
 MAIN_LABEL_FONT = ('Helvetica', 13)
 MAIN_LABEL_FONT_BOLD = ('Helvetica', 13, 'bold')
@@ -64,6 +68,13 @@ DC_TERMS = ['dc.contributor.advisor', 'dc.contributor.author', 'dc.contributor.e
             'dc.title', 'dc.type']
 
 
+'''
+Metadata window class opens up a child window and loads
+properties 
+
+'''
+
+
 class MetadataWindow(tk.Toplevel):
     def __init__(self, root=None, part=None):
         super().__init__()
@@ -72,7 +83,7 @@ class MetadataWindow(tk.Toplevel):
         if part:
             self.json_object = part
         else:
-            self.json_object = {**self.root._generate_json(), **self.root.package_metadata_extra}
+            self.json_object = {**self.root.generate_json(), **self.root.package_metadata_extra}
 
         self.controls_frame = self.dcterm = self.dcterm_value = None
 
@@ -117,7 +128,7 @@ class MetadataWindow(tk.Toplevel):
         self.destroy()
 
     def add_metadata(self):
-        if self.dcterm.get() == '':
+        if self.dcterm.get() == '':  # Trying to add an empty property
             pass
         elif self.dcterm.get() not in self.json_object:
             tv = tk.StringVar()
@@ -126,7 +137,9 @@ class MetadataWindow(tk.Toplevel):
                 .pack(side=tk.LEFT, pady=Y_PAD)
 
             if 'description' in self.dcterm.get():
-                tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT).pack(side=tk.LEFT, pady=Y_PAD)
+                desc = tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT)
+                desc.pack(side=tk.LEFT, pady=Y_PAD)
+                desc.insert('1.0', self.dcterm_value.get())
             else:
                 ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv).pack(side=tk.LEFT, pady=Y_PAD)
 
@@ -144,13 +157,16 @@ class MetadataWindow(tk.Toplevel):
             if not (json_property == 'parts' or
                     (self.json_object['parts'] == 'objects/' and json_property == 'dc.description.provenance')):
 
-                tv = tk.StringVar()
+                tv = None
                 fr = ttk.Frame(contents_frame)
                 ttk.Label(fr, text=json_property + ': ', width=20, font=MAIN_LABEL_FONT, anchor=tk.E)\
                     .pack(side=tk.LEFT, pady=Y_PAD)
 
                 if 'description' in json_property:
-                    tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT)
+                    tv = tk.Text(fr, width=40, height=4, font=MAIN_INPUT_FONT)
+                    tv.pack(side=tk.LEFT, pady=Y_PAD)
+                    tv.insert('1.0', self.json_object[json_property])
+
                 else:
                     if self.json_object['parts'] == 'objects/':
                         if json_property == 'dc.title':
@@ -163,21 +179,25 @@ class MetadataWindow(tk.Toplevel):
                             ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT,
                                       textvariable=self.root.package_author).pack(side=tk.LEFT, pady=Y_PAD)
                         else:
+                            tv = tk.StringVar()
                             ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv)\
                                 .pack(side=tk.LEFT, pady=Y_PAD)
 
                     else:
+                        tv = tk.StringVar()
                         ttk.Entry(fr, width=40, font=MAIN_INPUT_FONT, textvariable=tv).pack(side=tk.LEFT, pady=Y_PAD)
 
                 if json_property != 'dc.title' and json_property != 'dc.date.issued' and json_property != 'dc.creator':
                     ttk.Button(fr, text='Delete', command=fr.destroy).pack(side=tk.RIGHT, pady=Y_PAD, padx=X_PAD)
 
-                tv.set(self.json_object[json_property])
-                self.json_object[json_property] = tv
-                fr.pack(pady=Y_PAD)
+                if isinstance(tv, tk.Text):
+                    self.json_object[json_property] = tv.get("1.0", 'end-1c')
+                elif tv:
+                    tv.set(self.json_object[json_property])
+                    self.json_object[json_property] = tv
 
-        # sep = ttk.Separator(contents_frame, orient=tk.HORIZONTAL).pack()
-        # sep.pack() # grid(row=self.row_count, column=0, columnspan=3, pady=Y_PAD, sticky=tk.EW)
+                # print(self.json_object)
+                fr.pack(pady=Y_PAD)
 
     def position_metadata_controls(self, controls_frame):
         fr = ttk.Frame(controls_frame)
@@ -203,10 +223,15 @@ class MetadataWindow(tk.Toplevel):
         fr.pack()
 
 
+''' 
+Application class
+'''
+
+
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        # self.grid_columnconfigure(0, weight=1)
+        # Hard-coded minimum variables
         self.package_title = tk.StringVar()
         self.package_date = tk.StringVar()
         self.package_author = tk.StringVar()
@@ -322,9 +347,9 @@ class Application(tk.Frame):
         try:
             response = requests.post(host + '/users/' + user + '/login',
                                      data={'password': password, 'expiring': False})
-        except requests.ConnectionError as e:
+        except requests.ConnectionError:
             raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
-        except Exception as e:
+        except Exception:
             raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
 
         try:
@@ -353,7 +378,6 @@ class Application(tk.Frame):
         if response.status_code != expected_response:
             print('Response code: %s', response.status_code)
             print('Response body: %s', response.text)
-            # raise Exception(response.status_code, response)
 
         try:
             output = response.json()
@@ -366,16 +390,18 @@ class Application(tk.Frame):
 
         return response
 
-    def logout_from_as(self, host, method):
+    @staticmethod
+    def logout_from_as(host, method):
         try:
             response = method(host + '/logout', data={'Example': 'missing'})
-        except requests.ConnectionError as e:
+        except requests.ConnectionError:
             raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
-        except Exception as e:
+        except Exception:
             raise Exception("Unable to connect to ArchivesSpace server.\n\nIs the server URL correct?")
 
         if response.status_code == 200:
-            print('Logged out from ArchivesSpace server.')
+            pass
+            # print('Logged out from ArchivesSpace server.')
         else:
             print('Error logging out')
 
@@ -483,7 +509,7 @@ class Application(tk.Frame):
                 for file in files:
                     full_filename = os.path.join(subdir, file)
 
-    def _generate_json(self):
+    def generate_json(self):
         json_obj = { 'parts': 'objects/',
                      'dc.description.provenance': 'Submitted to Archivematica by ' + getpass.getuser() + " on computer "
                                                   + platform.node() + ' at ' + str(datetime.datetime.now())}
@@ -559,7 +585,7 @@ class Application(tk.Frame):
             os.mkdir(output_dir + '/metadata')
 
             with open(output_dir + '/metadata/metadata.json', 'w') as outfile:
-                json.dump([self._generate_json()], outfile)
+                json.dump([self.generate_json()], outfile)
         except FileExistsError as e:
             print('Error: ' + str(e))
         except IOError as e:
@@ -733,7 +759,7 @@ class Application(tk.Frame):
 
         ds_aip_tree.configure(yscrollcommand=vsb.set)
 
-        self.package_metadata.append(('ds_aip_collection', ds_aip_tree))
+        self.package_metadata.append(('dspace_aip_collection', ds_aip_tree))
 
         # Content for DSpace config panel
         self.create_label_entry(ds_aip_frame, 'DSpace server:', row=1, column=0, tv=self.ds_host)
@@ -751,12 +777,12 @@ class Application(tk.Frame):
 
         ttk.Button(ds_dip_frame,
                    text="Load DSpace hierarchy",
-                   command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_frame]))\
+                   command=lambda: self._populate_dspace_tree([ds_aip_tree, ds_dip_tree]))\
             .grid(row=2, column=0, columnspan=2, padx=(10, 5), pady=Y_PAD, sticky=tk.E)
 
         # Content for DSpace DIP tree panel
         ds_dip_tree = ttk.Treeview(sbar_frame, selectmode='none', show='tree', columns=('ID #', 'Name'),
-                                    displaycolumns='Name')
+                                   displaycolumns='Name')
         ds_dip_tree.column("#0", minwidth=0, width=400)
         # ds_dip_frame.column("Name", minwidth=0, width=300)
         ds_dip_tree.bind("<Button-1>", self.on_click)
@@ -767,7 +793,7 @@ class Application(tk.Frame):
         sbar_frame.grid(row=0, column=0, columnspan=3)
 
         ds_dip_tree.configure(yscrollcommand=vsb.set)
-        self.package_metadata.append(('ds_dip_collection', ds_dip_tree))
+        self.package_metadata.append(('dspace_dip_collection', ds_dip_tree))
 
     def create_select_frame(self, submit_frame):
         # Create frame for scrollbar + treeview
