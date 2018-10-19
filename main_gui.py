@@ -232,6 +232,7 @@ Application class
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
+
         # Hard-coded minimum variables
         self.package_title = tk.StringVar()
         self.package_date = tk.StringVar()
